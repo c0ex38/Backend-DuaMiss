@@ -9,6 +9,8 @@ from rest_framework.routers import DefaultRouter
 from company.views import CompanyViewSet
 from product.views import ProductViewSet
 from order.views import OrderViewSet
+from django.http import HttpResponse
+
 
 router = DefaultRouter()
 router.register(r'companies', CompanyViewSet, basename='company')
@@ -24,4 +26,5 @@ urlpatterns = [
 
     # 🌟 Bunu ekliyoruz:
     path('api/', include(router.urls)),
+    path("", lambda r: HttpResponse("Backend OK"))
 ]
