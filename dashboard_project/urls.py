@@ -9,7 +9,8 @@ from rest_framework.routers import DefaultRouter
 from company.views import CompanyViewSet
 from product.views import ProductViewSet
 from order.views import OrderViewSet
-from django.http import HttpResponse
+
+from dashboard_project.views import health_check
 
 
 router = DefaultRouter()
@@ -26,5 +27,6 @@ urlpatterns = [
 
     # 🌟 Bunu ekliyoruz:
     path('api/', include(router.urls)),
+    path("health", health_check),
     path("", lambda r: HttpResponse("Backend OK"))
 ]
