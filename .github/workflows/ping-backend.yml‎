@@ -1,0 +1,14 @@
+name: Ping Backend
+
+on:
+  schedule:
+    - cron: "*/1 * * * *"   # Her 5 dakikada bir çalışır
+  workflow_dispatch: {}       # İstersen elle de tetikleyebilirsin
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl backend health endpoint
+        run: |
+          curl -sS https://backend-duamiss.onrender.com/health/ || exit 0
