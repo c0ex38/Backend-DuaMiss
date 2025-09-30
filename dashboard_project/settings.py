@@ -73,20 +73,36 @@ TEMPLATES = [
 WSGI_APPLICATION = "dashboard_project.wsgi.application"
 
 # Veritabanı ayarları (PostgreSQL kullanılıyor)
+# Öncelik: Direct (5432) URL; yoksa pooled (6543) URL'yi kullan.
+_db_url_key = "DATABASE_URL_DIRECT" if env("DATABASE_URL_DIRECT", default=None) else "DATABASE_URL"
+_db = env.db_url(_db_url_key)
+
+_host = (_db.get("HOST") or "").lower()
+_port = str(_db.get("PORT") or "")
+_is_pooled = ("pooler" in _host) or (_port == "6543")  # Supabase PgBouncer (6543) ise True
+
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",  # Kullanılan veritabanı motoru
-        "NAME": env.db_url("DATABASE_URL")["NAME"],  # Veritabanı adı
-        "USER": env.db_url("DATABASE_URL")["USER"],  # Veritabanı kullanıcı adı
-        "PASSWORD": env.db_url("DATABASE_URL")["PASSWORD"],  # Veritabanı şifresi
-        "HOST": env.db_url("DATABASE_URL")["HOST"],  # Veritabanı sunucu adresi
-        "PORT": env.db_url("DATABASE_URL")["PORT"],  # Veritabanı portu
-        "CONN_MAX_AGE": 0,  # Bağlantı ömrü (saniye)
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": _db["NAME"],
+        "USER": _db["USER"],
+        "PASSWORD": _db["PASSWORD"],
+        "HOST": _db["HOST"],
+        "PORT": _db["PORT"],
+        # PgBouncer (6543) ile daima 0; Direct (5432) ile bağlantıyı bir süre açık tut.
+        "CONN_MAX_AGE": 0 if _is_pooled else 60,
+        # Django 3.1+ bağlantı sağlık kontrolü
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
-            "sslmode": "require",  # SSL bağlantı zorunluluğu
+            "sslmode": "require",
+            "connect_timeout": 5,
         },
     }
 }
+
+# PgBouncer ile server-side cursor'lar sorun çıkarabilir; pooled'da kapatıyoruz.
+if _is_pooled:
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
 
 # Şifre doğrulama kuralları
 AUTH_PASSWORD_VALIDATORS = [
