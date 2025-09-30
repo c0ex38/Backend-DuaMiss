@@ -2,13 +2,39 @@ name: Ping Backend
 
 on:
   schedule:
-    - cron: "*/1 * * * *" # Her dakikada bir
+    - cron: "*/1 * * * *"   # her dakika
   workflow_dispatch:
 
 jobs:
   ping-backend:
     runs-on: ubuntu-latest
+    env:
+      BACKEND_URL: ${{ secrets.BACKEND_URL }}
     steps:
-      - name: Ping /health endpoint
+      - name: Check BACKEND_URL present
         run: |
-          curl -sSf ${{ secrets.BACKEND_URL }}/health || exit 1
+          if [ -z "${BACKEND_URL}" ]; then
+            echo "ERROR: BACKEND_URL secret is empty or not set."
+            exit 1
+          fi
+
+      # Render gibi servislerde soğuk başlatma süresi için nazik bir uyarı ping'i
+      - name: Warm up (non-failing ping to /)
+        run: |
+          curl -fsS -m 5 -o /dev/null -L "${BACKEND_URL}" || true
+
+      - name: Ping /health with retries
+        run: |
+          set -e
+          # 60 sn içinde ayağa kalkması için tekrar dene (6x10sn)
+          for i in {1..6}; do
+            echo "Attempt $i: ${BACKEND_URL}/health"
+            if curl -fsS -m 10 -L "${BACKEND_URL}/health" -H "User-Agent: gh-actions-ping"; then
+              echo "Healthy ✅"
+              exit 0
+            fi
+            echo "Not ready yet, waiting 10s…"
+            sleep 10
+          done
+          echo "ERROR: Health check failed after retries."
+          exit 1
