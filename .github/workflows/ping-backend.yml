@@ -1,0 +1,14 @@
+name: Ping Backend
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # Her 10 dakikada bir
+  workflow_dispatch:
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health endpoint
+        run: |
+          curl -sSf ${{ secrets.BACKEND_URL }}/health || exit 1
