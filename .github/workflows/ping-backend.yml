@@ -2,7 +2,7 @@ name: Ping Backend
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # Her 10 dakikada bir
+    - cron: "*/1 * * * *" # Her dakikada bir
   workflow_dispatch:
 
 jobs:
