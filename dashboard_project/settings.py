@@ -69,27 +69,43 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "dashboard_project.wsgi.application"
 
-# --- DATABASE (Supabase pooled) ---
-# PgBouncer 'transaction' mode ile 6543 portu -> persistent connections kapalı olmalı
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env.db_url("DATABASE_URL")["NAME"],
-        "USER": env.db_url("DATABASE_URL")["USER"],
-        "PASSWORD": env.db_url("DATABASE_URL")["PASSWORD"],
-        "HOST": env.db_url("DATABASE_URL")["HOST"],
-        "PORT": env.db_url("DATABASE_URL")["PORT"],
-        "CONN_MAX_AGE": 0,  # PgBouncer transaction mode ile güvenli
-        "OPTIONS": {
-            "sslmode": "require",  # Supabase SSL zorunlu
+# --- LOGGING (Production debug için) ---
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
         },
     },
-    "sqlite_old": {  # ESKİ SQLite
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",  # dosyan burada
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
     },
-    
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
 }
+
+# --- DATABASE ---
+# Render.com otomatik DATABASE_URL sağlar, django-environ ile parse edilir
+DATABASES = {
+    "default": env.db_url(
+        "DATABASE_URL",
+        default="sqlite:///db.sqlite3"  # type: ignore[arg-type]  # Fallback for local dev
+    )
+}
+
+# PostgreSQL için özel ayarlar
+if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
+    DATABASES["default"]["CONN_MAX_AGE"] = 0  # PgBouncer transaction mode
+    DATABASES["default"]["OPTIONS"] = {
+        "sslmode": "require",  # Production SSL zorunlu
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -142,3 +158,37 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# Logging configuration for production debugging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}

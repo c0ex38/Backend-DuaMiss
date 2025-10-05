@@ -4,7 +4,8 @@ services:
     runtime: python
     plan: free
     buildCommand: "./build.sh"
-    startCommand: "gunicorn dashboard_project.wsgi:application"
+    startCommand: "gunicorn dashboard_project.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 --access-logfile - --error-logfile -"
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -15,13 +16,13 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
-        value: False
+        value: "False"
       - key: ALLOWED_HOSTS
-        sync: false
+        value: backend-duamiss.onrender.com,.onrender.com
       - key: CORS_ALLOWED_ORIGINS
-        sync: false
+        value: https://frontend-dua-miss.vercel.app,https://frontend-duamiss.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
-        sync: false
+        value: https://backend-duamiss.onrender.com,https://*.onrender.com,https://*.vercel.app
 
 databases:
   - name: duamiss-db
