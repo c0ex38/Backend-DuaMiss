@@ -102,9 +102,11 @@ DATABASES = {
 
 # PostgreSQL için özel ayarlar
 if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
-    DATABASES["default"]["CONN_MAX_AGE"] = 0  # PgBouncer transaction mode
+    # Supabase Session mode (port 6543) için ayarlar
+    DATABASES["default"]["CONN_MAX_AGE"] = 60  # Session mode için connection pooling
     DATABASES["default"]["OPTIONS"] = {
         "sslmode": "require",  # Production SSL zorunlu
+        "connect_timeout": 10,  # Timeout 10 saniye
     }
 
 AUTH_PASSWORD_VALIDATORS = [
