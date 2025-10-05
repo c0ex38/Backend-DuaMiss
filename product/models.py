@@ -1,6 +1,5 @@
 from django.db import models
 from django.conf import settings
-from company.models import Company
 
 class Product(models.Model):
     code = models.CharField(max_length=50, unique=True)
