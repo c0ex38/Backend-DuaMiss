@@ -10,10 +10,17 @@ env = environ.Env(
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = env("SECRET_KEY", default="insecure-change-me")
-DEBUG = env.bool("DEBUG", default=False)
+# django-environ's stubs cause spurious type complaints about the `default` parameter.
+SECRET_KEY = env.str("SECRET_KEY", default="insecure-change-me")  # type: ignore[arg-type]
+# Pylance's type stubs for django-environ can be overly strict; ignore the arg-type false positive below.
+DEBUG = env.bool("DEBUG", default=False)  # type: ignore[arg-type]
 
-ALLOWED_HOSTS = [h.strip() for h in env("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")]
+# Prefer env.list for lists to avoid calling .split() on a value that static analysis
+# thinks may be `NoValue`.
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])  # type: ignore[arg-type]
+
+# CSRF Trusted Origins (for production frontend)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])  # type: ignore[arg-type]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -118,10 +125,20 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [o.strip() for o in env("CORS_ALLOWED_ORIGINS", default="http://localhost:3000").split(",")]
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"])  # type: ignore[arg-type]
 
 AUTH_USER_MODEL = "users.CustomUser"
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# Security settings for production
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Enable these in production for better security
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
