@@ -4,7 +4,6 @@ import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# --- env ---
 env = environ.Env(
     DEBUG=(bool, False),
 )
@@ -14,6 +13,17 @@ SECRET_KEY = env("SECRET_KEY", default="insecure-change-me")
 DEBUG = env.bool("DEBUG", default=False)
 
 ALLOWED_HOSTS = [h.strip() for h in env("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")]
+
+# --- Frontend / CORS / CSRF ---
+# Comma-separated full origins, e.g. "https://your-frontend.vercel.app,https://www.yourdomain.com"
+FRONTEND_ORIGINS = [o.strip() for o in env("FRONTEND_ORIGINS", default="").split(",") if o.strip()]
+
+# If you prefer to allow all during early staging, keep CORS_ALLOW_ALL_ORIGINS=True below.
+# For production, explicitly set allowed origins via FRONTEND_ORIGINS.
+CORS_ALLOWED_ORIGINS = FRONTEND_ORIGINS
+
+# CSRF requires scheme in Django 4+ (e.g., "https://example.com")
+CSRF_TRUSTED_ORIGINS = FRONTEND_ORIGINS
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -62,20 +72,28 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "dashboard_project.wsgi.application"
 
-# --- DATABASE (Supabase pooled) ---
-# PgBouncer 'transaction' mode ile 6543 portu -> persistent connections kapalı olmalı
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env.db_url("DATABASE_URL")["NAME"],
-        "USER": env.db_url("DATABASE_URL")["USER"],
-        "PASSWORD": env.db_url("DATABASE_URL")["PASSWORD"],
-        "HOST": env.db_url("DATABASE_URL")["HOST"],
-        "PORT": env.db_url("DATABASE_URL")["PORT"],
-        "CONN_MAX_AGE": 0,  # PgBouncer transaction mode ile güvenli
-        "OPTIONS": {
-            "sslmode": "require",  # Supabase SSL zorunlu
-        },
+    "default": (
+        # Prefer DATABASE_URL if provided (Railway, Render, etc.)
+        env.db_url("DATABASE_URL", default=None)
+        and {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env.db_url("DATABASE_URL")["NAME"],
+            "USER": env.db_url("DATABASE_URL")["USER"],
+            "PASSWORD": env.db_url("DATABASE_URL")["PASSWORD"],
+            "HOST": env.db_url("DATABASE_URL")["HOST"],
+            "PORT": env.db_url("DATABASE_URL")["PORT"],
+            "CONN_MAX_AGE": 0,
+            "OPTIONS": {
+                # Railway supports TLS; if your instance doesn't, override via env: PGSSLMODE=disable
+                "sslmode": env("PGSSLMODE", default="require"),
+                "connect_timeout": 10,
+            },
+        }
+    ) or {
+        # Local fallback (no DATABASE_URL): use SQLite
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
 
@@ -86,7 +104,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Türkiye için daha uygun:
 LANGUAGE_CODE = "tr-tr"
 TIME_ZONE = "Europe/Istanbul"
 USE_I18N = True
@@ -105,26 +122,29 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # prod için öneri
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
 }
 
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [o.strip() for o in env("CORS_ALLOWED_ORIGINS", default="http://localhost:3000").split(",")]
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 AUTH_USER_MODEL = "users.CustomUser"
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# Proxy header - Load balancer arkasındaysa HTTPS algılama için
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# Security Settings - Tamamen devre dışı (hem HTTP hem HTTPS kullanılabilir)
-# Bu ayarlar kullanıcı isteği üzerine kapatıldı
-# SESSION_COOKIE_SECURE = False  # HTTP'de de çalışır
-# CSRF_COOKIE_SECURE = False  # HTTP'de de çalışır
-# SECURE_HSTS_SECONDS = 0  # HSTS kapalı
-# SECURE_SSL_REDIRECT = False  # HTTP -> HTTPS yönlendirme yok
+# --- Security (production) ---
+USE_X_FORWARDED_HOST = True
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24  # 1 day to start; increase after confirming HTTPS works
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SECURE_SSL_REDIRECT = True
